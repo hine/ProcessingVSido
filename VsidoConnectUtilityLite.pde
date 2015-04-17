@@ -18,19 +18,22 @@ final byte COMMAND_OP_TARGETANGLE = (byte)0x6f; // 'o'
 ControlP5 cp5;
 
 // UIのインスタンス
-DropdownList dl_serial_port;
-DropdownList dl_serial_rate;
 Button btn_serial_connect;
 Button btn_serial_disconnect;
+DropdownList dl_serial_port;
+DropdownList dl_serial_rate;
 Numberbox nb_servo_id;
 Numberbox nb_servo_angle;
 Slider sl_servo_angle;
 CheckBox cb_log_visible;
 Textarea ta_log;
+Textfield tf_command;
+Button btn_send_command;
 
 // UIグループのインスタンス
 GroupBox gb_serial_conn = new GroupBox(10, 10, 580, 90, "Serial Connection");
 GroupBox gb_servo_angle = new GroupBox(10, 110, 580, 60, "Servo Angle Command");
+GroupBox gb_send_command = new GroupBox(10, 180, 580, 90, "Send Command");
 
 // シリアル接続
 Serial serial_port;
@@ -41,7 +44,7 @@ float last_angle = 0.0;
 
 void setup() {
   // Window立ち上げ
-  size(600, 400);
+  size(600, 600);
   
   // UI初期化
   cp5 = new ControlP5(this);
@@ -51,12 +54,12 @@ void setup() {
   // 以下UI設置
 
   // 接続ボタン
-  btn_serial_connect = cp5.addButton("Connect");
+  btn_serial_connect = cp5.addButton("connect");
   uiCustomize(btn_serial_connect);
   btn_serial_connect.setPosition(370, 70);
   btn_serial_connect.setSize(100, 20);
   // 切断ボタン
-  btn_serial_disconnect = cp5.addButton("Disonnect");
+  btn_serial_disconnect = cp5.addButton("disonnect");
   uiCustomize(btn_serial_disconnect);
   btn_serial_disconnect.setPosition(480, 70);
   btn_serial_disconnect.setSize(100, 20);
@@ -99,19 +102,31 @@ void setup() {
   sl_servo_angle.setNumberOfTickMarks(361);
   sl_servo_angle.setValue(7.0); // Todo:何故か7ズレるので、0にするために7とセット。原因を調べる。
 
+  // 任意のコマンドを送信するためのテキストフィールド
+  tf_command = cp5.addTextfield("send_command");
+  uiCustomize(tf_command);
+  tf_command.setPosition(20, 240);
+  tf_command.setSize(440, 20);
+  tf_command.setText("ff ");
+  // 切断ボタン
+  btn_send_command = cp5.addButton("send");
+  uiCustomize(btn_send_command);
+  btn_send_command.setPosition(480, 240);
+  btn_send_command.setSize(100, 20);
+
+
   // 送受信ログの表示チェックボックス
   cb_log_visible = cp5.addCheckBox("log_visible");
   uiCustomize(cb_log_visible);
-  cb_log_visible.setPosition(10, 180);
+  cb_log_visible.setPosition(10, 280);
   cb_log_visible.setSize(20, 20);
   cb_log_visible.setItemsPerRow(1);
   cb_log_visible.addItem("Show TX/RX log", 0);
   // 送受信ログ
   ta_log = cp5.addTextarea("log");
   uiCustomize(ta_log);
-  ta_log.setPosition(10, 210);
+  ta_log.setPosition(10, 310);
   ta_log.setSize(580, 170);
-  ta_log.setLineHeight(16);
   ta_log.setColorBackground(UI_INACTIVE_COLOR);
 }
 
@@ -126,6 +141,7 @@ void draw() {
   if (serial_port != null) {
   while (serial_port.available() > 0) {
     data = serial_port.read();
+    println(data);
     if (data == 0xff) {
       buffer = new byte[0];
     }
@@ -142,6 +158,7 @@ void draw() {
         if (cb_log_visible.getState(0)) {
           ta_log.append(log_text);
           ta_log.scroll(1.0);
+          buffer = new byte[0];
         }
       }
     }
@@ -190,11 +207,20 @@ void uiCustomize(CheckBox cb) {
 }
 void uiCustomize(Textarea ta) {
   ta.setCaptionLabel("");
+  ta.setLineHeight(16);
   ta.setColor(UI_TEXT_COLOR);
   ta.setColorLabel(UI_TEXT_COLOR);
   ta.setColorForeground(UI_TEXT_COLOR);
   ta.setColorBackground(UI_BG_COLOR);
   ta.setColorActive(UI_ACTIVE_COLOR);
+}
+void uiCustomize(Textfield tf) {
+  tf.setCaptionLabel("");
+  tf.setColor(UI_TEXT_COLOR);
+  tf.setColorLabel(UI_TEXT_COLOR);
+  tf.setColorForeground(UI_TEXT_COLOR);
+  tf.setColorBackground(UI_BG_COLOR);
+  tf.setColorActive(UI_ACTIVE_COLOR);
 }
 
 // 画面描画メソッド
@@ -209,13 +235,15 @@ void draw_all() {
   gb_servo_angle.update();
   fill(TEXT_COLOR);
   textSize(14);
-  text("ServoID", 20, 154);
-  text("Angle[deg]", 160, 154);
+  text("ServoID", 20, gb_servo_angle.pos_y + 44);
+  text("Angle[deg]", 160, gb_servo_angle.pos_y + 44);
   textSize(10);
-  text("-180", 320, 140);
-  text("0", 446, 140);
-  text("180", 560, 140);
-
+  text("-180", 320, gb_servo_angle.pos_y + 30);
+  text("0", 446, gb_servo_angle.pos_y + 30);
+  text("180", 560, gb_servo_angle.pos_y + 30);
+  gb_send_command.update();
+  textSize(14);
+  text("Command ([space] separated hex)", 20, gb_send_command.pos_y + 44);
 }
 
 // 画面描画のためのクラス
@@ -261,7 +289,7 @@ void controlEvent(ControlEvent theEvent) {
   }
   else if (theEvent.isController()) {
     println("event from controller : "+theEvent.getController().getValue()+" from "+theEvent.getController());
-    if (theEvent.controller().name() == "Connect") {
+    if (theEvent.controller().name() == "connect") {
       if (!serial_connected) {
         try {
           serial_port = new Serial(this, Serial.list()[(int)(dl_serial_port.getValue())], Integer.parseInt(SERIAL_BAUTRATES[(int)(dl_serial_rate.getValue())]));
@@ -272,15 +300,20 @@ void controlEvent(ControlEvent theEvent) {
         }
       }
     }
-    if (theEvent.controller().name() == "Disconnect") {
+    if (theEvent.controller().name() == "disconnect") {
       if (serial_connected) {
         serial_port.clear();
         serial_port.stop();
-        serial_connected = false;
+        serial_connected = false; // todo:何か切断できていない様子
+      }
+    }
+    if (theEvent.controller().name() == "send") {
+      if (serial_connected) {
+        sendCommand(parseCommand(tf_command.getText()));
       }
     }
     if (theEvent.controller().name() == "servo_angle") {
-      //sl_servo_angle.setValue(nb_servo_angle.getValue());
+      //sl_servo_angle.setValue(nb_servo_angle.getValue()); // todo:相互連動
     }
     if (theEvent.controller().name() == "servo_angle_slider") {
       if (sl_servo_angle.getValue() != last_angle) {
@@ -309,7 +342,19 @@ void sendCommand(byte[] command) {
   }
 }
 
-void serialEvent(Serial p) {
+byte[] parseCommand(String command_string) {
+  String[] command_chrs = {};
+  command_chrs = splitTokens(command_string);
+  byte[] command = {};
+  try {
+    for (int i = 0; i < command_chrs.length; i++) {
+      command = (byte[])append(command, (byte)(unhex(command_chrs[i])));
+    }
+  } catch (RuntimeException e) {
+    System.out.println("illegal command format.");
+    command = new byte[0];
+  }
+  return command;
 }
 
 byte[] makeSingleAngleCommand(int sid, float angle, int cycle) {
