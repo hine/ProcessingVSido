@@ -23,6 +23,7 @@ ControlP5 cp5;
 // UIのインスタンス
 DropdownList dl_serial_port;
 DropdownList dl_serial_rate;
+Button btn_refresh_port_list;
 Button btn_serial_connect;
 Button btn_serial_disconnect;
 Numberbox nb_servo_id;
@@ -37,10 +38,11 @@ Button btn_get_ik;
 Numberbox nb_walk_speed;
 Numberbox nb_walk_turn;
 Button btn_walk;
-CheckBox cb_log_visible;
-Button btn_send_command;
-Textarea ta_log;
+CheckBox cb_gpio;
 Textfield tf_command;
+Button btn_send_command;
+CheckBox cb_log_visible;
+Textarea ta_log;
 
 // UIグループのインスタンス
 // ※UIの設置Y座標はこれらのインスタンスのpos_yからの相対位置とする
@@ -125,6 +127,11 @@ void draw_all() {
 void add_all_ui() {
   //※DropdownListはUIを一番前面に持ってきたいので、最後に指定する
 
+  // 接続ボタン
+  btn_refresh_port_list = cp5.addButton("refresh");
+  uiCustomize(btn_refresh_port_list);
+  btn_refresh_port_list.setPosition(60, gb_serial_conn.pos_y + 60);
+  btn_refresh_port_list.setSize(100, 20);
   // 接続ボタン
   btn_serial_connect = cp5.addButton("connect");
   uiCustomize(btn_serial_connect);
@@ -224,6 +231,18 @@ void add_all_ui() {
   uiCustomize(btn_walk);
   btn_walk.setPosition(480, gb_walk.pos_y + 30);
   btn_walk.setSize(100, 20);
+
+  // GPIOチェックボタン
+  cb_gpio = cp5.addCheckBox("gpio");
+  uiCustomize(cb_gpio);
+  cb_gpio.setPosition(30, gb_gpio.pos_y + 30);
+  cb_gpio.setSize(20, 20);
+  cb_gpio.setItemsPerRow(4);
+  cb_gpio.setSpacingColumn(60);
+  cb_gpio.addItem("pin4", 4);
+  cb_gpio.addItem("pin5", 5);
+  cb_gpio.addItem("pin6", 6);
+  cb_gpio.addItem("pin7", 7);
 
   // 任意のコマンドを送信するためのテキストフィールド
   tf_command = cp5.addTextfield("send_command");
@@ -376,9 +395,18 @@ void controlEvent(ControlEvent theEvent) {
         ta_log.setColorBackground(UI_INACTIVE_COLOR);
       }
     }
+    if (theEvent.group().name() == "gpio") {
+      if (cb_log_visible.getState(4)) {
+      }
+    }
   }
   else if (theEvent.isController()) {
     println("event from controller : "+theEvent.getController().getValue()+" from "+theEvent.getController());
+    // CONNECTボタンをクリックした時
+    if (theEvent.controller().name() == "refresh") {
+      dl_serial_port.clear(); // リストを一旦削除
+      dl_serial_port.addItems(Serial.list()); // シリアルポートの一覧を選択肢に追加
+    }
     // CONNECTボタンをクリックした時
     if (theEvent.controller().name() == "connect") {
       if (!serial_connected) {
