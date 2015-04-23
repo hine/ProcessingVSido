@@ -468,10 +468,10 @@ void controlEvent(ControlEvent theEvent) {
 
 void sendCommand(byte[] command) {
   if (serial_connected) {
+    serial_port.write(command);
     String log_text = "";
     log_text += ">";
     for (int i = 0; i < command.length; i++) {
-      serial_port.write(command[i]);
       log_text += " ";
       log_text += hex(command[i]);
     }
@@ -556,7 +556,7 @@ byte[] makeSetIKCommand(int kid, int x, int y, int z) {
 // サーボにIK位置を取得するコマンドを生成する
 byte[] makeGetIKCommand(int kid) {
   byte[] data = {};
- 
+
   data = (byte[])append(data, COMMAND_ST); // ST
   data = (byte[])append(data, COMMAND_OP_IK); // OP
   data = (byte[])append(data, (byte)0); // LN仮置き（あとで計算する）
