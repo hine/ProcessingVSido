@@ -259,14 +259,14 @@ void add_all_ui() {
   // 送受信ログの表示チェックボックス
   cb_log_visible = cp5.addCheckBox("log_visible");
   uiCustomize(cb_log_visible);
-  cb_log_visible.setPosition(610, 10);
+  cb_log_visible.setPosition(610, 20);
   cb_log_visible.setSize(20, 20);
   cb_log_visible.setItemsPerRow(1);
   cb_log_visible.addItem("Show TX/RX log", 0);
   // 送受信ログ
   ta_log = cp5.addTextarea("log");
   uiCustomize(ta_log);
-  ta_log.setPosition(610, 40);
+  ta_log.setPosition(610, 50);
   ta_log.setSize(370, 540);
   ta_log.setColorBackground(UI_INACTIVE_COLOR);
 
@@ -392,6 +392,7 @@ void controlEvent(ControlEvent theEvent) {
       if (cb_log_visible.getState(0)) {
         ta_log.setColorBackground(UI_BG_COLOR);
       } else {
+        ta_log.clear();
         ta_log.setColorBackground(UI_INACTIVE_COLOR);
       }
     }
@@ -614,8 +615,10 @@ void check_serial_rx() {
       }
       buffer = (byte[])append(buffer, (byte)data);
       if (buffer.length > 3) {
-        // リターンコードの長さの取得と、取得の比較
+        // LNLN(3バイト目)を受信すると受信すべきバイト数がわかるので、LNの長さまではバッファに貯め続ける
         if (buffer.length == buffer[2]) {
+          // LN(3バイト目)で指定された長さの受信をして、受信完了処理
+          // リターンコードに応じた処理
           switch((int)buffer[1]) {
             case 0x21:
               // ack
@@ -629,7 +632,7 @@ void check_serial_rx() {
               }
               break;
           }
-          // 期待する長さのリターンコードを取得したらバッファをログに吐き出す
+          // バッファのログへの吐き出す
           String log_text = "";
           log_text += "<";
           for (int i = 0; i < buffer.length; i++) {
@@ -637,6 +640,7 @@ void check_serial_rx() {
             log_text += hex(buffer[i]);
           }
           log_text += "\n";
+          println(log_text);
           if (cb_log_visible.getState(0)) {
             ta_log.append(log_text);
             ta_log.scroll(1.0);
