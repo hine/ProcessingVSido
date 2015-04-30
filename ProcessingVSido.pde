@@ -16,6 +16,8 @@ final byte COMMAND_ST = (byte)0xff;
 final byte COMMAND_OP_TARGETANGLE = (byte)0x6f; // 'o'
 final byte COMMAND_OP_IK = (byte)0x6b; // 'k'
 final byte COMMAND_OP_WALK = (byte)0x74; // 't'
+final byte COMMAND_OP_SETVID = (byte)0x73; // 's'
+final byte COMMAND_OP_GPIO = (byte)0x69; // 'i'
 
 // UIのためのControlP5
 ControlP5 cp5;
@@ -38,11 +40,15 @@ Button btn_get_ik;
 Numberbox nb_walk_speed;
 Numberbox nb_walk_turn;
 Button btn_walk;
-CheckBox cb_gpio;
+CheckBox cb_gpio_pin4;
+CheckBox cb_gpio_pin5;
+CheckBox cb_gpio_pin6;
+CheckBox cb_gpio_pin7;
 Textfield tf_command;
 Button btn_send_command;
 CheckBox cb_log_visible;
 Textarea ta_log;
+Textarea ta_status;
 
 // UIグループのインスタンス
 // ※UIの設置Y座標はこれらのインスタンスのpos_yからの相対位置とする
@@ -64,7 +70,7 @@ float last_angle = 0.0;
 
 void setup() {
   // Window立ち上げ
-  size(1000, 620);
+  size(1000, 650);
   
   // UI初期化
   cp5 = new ControlP5(this);
@@ -74,9 +80,9 @@ void setup() {
   // UI設置
   // ※ControlP5を使っているので、設置するだけでOK。draw()内に記述なし
   add_all_ui();
-
 }
 
+// メインループ
 void draw() {
   // 背景色
   background(BG_COLOR);
@@ -233,16 +239,26 @@ void add_all_ui() {
   btn_walk.setSize(100, 20);
 
   // GPIOチェックボタン
-  cb_gpio = cp5.addCheckBox("gpio");
-  uiCustomize(cb_gpio);
-  cb_gpio.setPosition(30, gb_gpio.pos_y + 30);
-  cb_gpio.setSize(20, 20);
-  cb_gpio.setItemsPerRow(4);
-  cb_gpio.setSpacingColumn(60);
-  cb_gpio.addItem("pin4", 4);
-  cb_gpio.addItem("pin5", 5);
-  cb_gpio.addItem("pin6", 6);
-  cb_gpio.addItem("pin7", 7);
+  cb_gpio_pin4 = cp5.addCheckBox("gpio_pin4");
+  uiCustomize(cb_gpio_pin4);
+  cb_gpio_pin4.setPosition(30, gb_gpio.pos_y + 30);
+  cb_gpio_pin4.setItemsPerRow(1);
+  cb_gpio_pin4.addItem("pin4", 0);
+  cb_gpio_pin5 = cp5.addCheckBox("gpio_pin5");
+  uiCustomize(cb_gpio_pin5);
+  cb_gpio_pin5.setPosition(110, gb_gpio.pos_y + 30);
+  cb_gpio_pin5.setItemsPerRow(1);
+  cb_gpio_pin5.addItem("pin5", 0);
+  cb_gpio_pin6 = cp5.addCheckBox("gpio_pin6");
+  uiCustomize(cb_gpio_pin6);
+  cb_gpio_pin6.setPosition(190, gb_gpio.pos_y + 30);
+  cb_gpio_pin6.setItemsPerRow(1);
+  cb_gpio_pin6.addItem("pin6", 0);
+  cb_gpio_pin7 = cp5.addCheckBox("gpio_pin7");
+  uiCustomize(cb_gpio_pin7);
+  cb_gpio_pin7.setPosition(270, gb_gpio.pos_y + 30);
+  cb_gpio_pin7.setItemsPerRow(1);
+  cb_gpio_pin7.addItem("pin7", 0);
 
   // 任意のコマンドを送信するためのテキストフィールド
   tf_command = cp5.addTextfield("send_command");
@@ -266,9 +282,18 @@ void add_all_ui() {
   // 送受信ログ
   ta_log = cp5.addTextarea("log");
   uiCustomize(ta_log);
+  ta_log.showScrollbar();
   ta_log.setPosition(610, 50);
   ta_log.setSize(370, 540);
   ta_log.setColorBackground(UI_INACTIVE_COLOR);
+
+  // Status表示
+  ta_status = cp5.addTextarea("status");
+  uiCustomize(ta_status);
+  ta_status.hideScrollbar();
+  ta_status.setPosition(10, height - 30);
+  ta_status.setSize(980, 20);
+  ta_status.setColorBackground(UI_INACTIVE_COLOR);
 
   //DropdownList関連UI
   // 通信ポートのドロップダウンリスト
@@ -277,11 +302,13 @@ void add_all_ui() {
   dl_serial_port.setWidth(320);
   dl_serial_port.setPosition(60, gb_serial_conn.pos_y + 50);
   dl_serial_port.addItems(Serial.list()); // シリアルポートの一覧を選択肢に追加
+  dl_serial_port.setValue(0);
   // 通信ボーレートのドロップダウンリスト
   dl_serial_rate = cp5.addDropdownList("serial_rate");
   uiCustomize(dl_serial_rate);
   dl_serial_rate.setPosition(480, gb_serial_conn.pos_y + 50);
   dl_serial_rate.addItems(SERIAL_BAUTRATE_LIST);
+  dl_serial_rate.setValue(0);
 
   // KIDのドロップダウンリスト
   dl_kid = cp5.addDropdownList("kid");
@@ -289,6 +316,7 @@ void add_all_ui() {
   dl_kid.setWidth(120);
   dl_kid.setPosition(60, gb_ik.pos_y + 50);
   dl_kid.addItems(KID_LIST); // シリアルポートの一覧を選択肢に追加
+  dl_kid.setValue(0);
 }
 
 // 各種UIのカスタマイズ
@@ -329,6 +357,7 @@ void uiCustomize(Slider sl) {
 // Checkbox
 void uiCustomize(CheckBox cb) {
   cb.setCaptionLabel("");
+  cb.setSize(20, 20);
   cb.setColorLabel(UI_TEXT_COLOR);
   cb.setColorBackground(UI_BG_COLOR);
   cb.setColorActive(UI_ACTIVE_COLOR);
@@ -396,17 +425,74 @@ void controlEvent(ControlEvent theEvent) {
         ta_log.setColorBackground(UI_INACTIVE_COLOR);
       }
     }
-    if (theEvent.group().name() == "gpio") {
-      if (cb_log_visible.getState(4)) {
+    if (theEvent.group().name() == "gpio_pin4") {
+      if (cb_gpio_pin4.getState(0)) {
+        if (serial_connected) {
+          sendCommand(makeVidSetCommand(3, 0x78));
+          delay(10);
+          sendCommand(makeGPIOCommand(4, 1));
+        } else {
+          cb_gpio_pin4.deactivate(0);
+        }
+      } else {
+        if (serial_connected) {
+          sendCommand(makeGPIOCommand(4, 0));
+        }
+      }
+    }
+    if (theEvent.group().name() == "gpio_pin5") {
+      if (cb_gpio_pin5.getState(0)) {
+        if (serial_connected) {
+          sendCommand(makeVidSetCommand(3, 0x78));
+          delay(10);
+          sendCommand(makeGPIOCommand(5, 1));
+        } else {
+          cb_gpio_pin5.deactivate(0);
+        }
+      } else {
+        if (serial_connected) {
+          sendCommand(makeGPIOCommand(5, 0));
+        }
+      }
+    }
+    if (theEvent.group().name() == "gpio_pin6") {
+      if (cb_gpio_pin6.getState(0)) {
+        if (serial_connected) {
+          sendCommand(makeVidSetCommand(3, 0x78));
+          delay(10);
+          sendCommand(makeGPIOCommand(6, 1));
+        } else {
+          cb_gpio_pin6.deactivate(0);
+        }
+      } else {
+        if (serial_connected) {
+          sendCommand(makeGPIOCommand(6, 0));
+        }
+      }
+    }
+    if (theEvent.group().name() == "gpio_pin7") {
+      if (cb_gpio_pin7.getState(0)) {
+        if (serial_connected) {
+          sendCommand(makeVidSetCommand(3, 0x78));
+          delay(10);
+          sendCommand(makeGPIOCommand(7, 1));
+        } else {
+          cb_gpio_pin7.deactivate(0);
+        }
+      } else {
+        if (serial_connected) {
+          sendCommand(makeGPIOCommand(7, 0));
+        }
       }
     }
   }
   else if (theEvent.isController()) {
     println("event from controller : "+theEvent.getController().getValue()+" from "+theEvent.getController());
-    // CONNECTボタンをクリックした時
+    // REFRESHボタンをクリックした時
     if (theEvent.controller().name() == "refresh") {
       dl_serial_port.clear(); // リストを一旦削除
       dl_serial_port.addItems(Serial.list()); // シリアルポートの一覧を選択肢に追加
+      dl_serial_port.setValue(0);
     }
     // CONNECTボタンをクリックした時
     if (theEvent.controller().name() == "connect") {
@@ -414,9 +500,10 @@ void controlEvent(ControlEvent theEvent) {
         try {
           serial_port = new Serial(this, Serial.list()[(int)(dl_serial_port.getValue())], Integer.parseInt(SERIAL_BAUTRATE_LIST[(int)(dl_serial_rate.getValue())]));
           serial_connected = true;
+          ta_status.setText("Connected.");
         } catch (RuntimeException e) {
-          System.out.println("port in use, trying again later...");
           serial_connected = false;
+          ta_status.setText("Cannot connect. Maybe in use.");
         }
       }
     }
@@ -425,7 +512,8 @@ void controlEvent(ControlEvent theEvent) {
       if (serial_connected) {
         serial_port.clear();
         serial_port.stop();
-        serial_connected = false; // todo:何か切断できていない様子
+        serial_connected = false;
+        ta_status.setText("Disconnected.");
       }
     }
     // SERVO角度を変更した時
@@ -602,6 +690,50 @@ byte[] makeWalkCommand(int speed, int turn) {
   return data;
 }
 
+// VIDの値のセットコマンドを生成する
+byte[] makeVidSetCommand(int vid, int vdata) {
+  byte[] data = {};
+ 
+  data = (byte[])append(data, COMMAND_ST); // ST
+  data = (byte[])append(data, COMMAND_OP_SETVID); // OP
+  data = (byte[])append(data, (byte)0); // LN仮置き（あとで計算する）
+  data = (byte[])append(data, (byte)vid); // VID
+  data = (byte[])append(data, (byte)vdata); // VDT
+
+  data = (byte[])append(data, (byte)0); // SUM仮置き
+
+  data[2] = byte(data.length);
+
+  byte sum = 0;
+  for (int i = 0; i < data.length - 1; i++) {
+    sum ^= data[i];
+  }
+  data[data.length - 1] = sum;
+  return data;
+}
+
+// GPIOコマンドを生成する
+byte[] makeGPIOCommand(int port, int value) {
+  byte[] data = {};
+ 
+  data = (byte[])append(data, COMMAND_ST); // ST
+  data = (byte[])append(data, COMMAND_OP_GPIO); // OP
+  data = (byte[])append(data, (byte)0); // LN仮置き（あとで計算する）
+  data = (byte[])append(data, (byte)port); // IID(4-7)
+  data = (byte[])append(data, (byte)value); // VAL
+
+  data = (byte[])append(data, (byte)0); // SUM仮置き
+
+  data[2] = byte(data.length);
+
+  byte sum = 0;
+  for (int i = 0; i < data.length - 1; i++) {
+    sum ^= data[i];
+  }
+  data[data.length - 1] = sum;
+  return data;
+}
+
 // シリアル受信処理（CONNECTからのリターンコード）
 void check_serial_rx() {
   int data;
@@ -651,3 +783,4 @@ void check_serial_rx() {
     }
   }
 }
+
