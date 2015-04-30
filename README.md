@@ -32,7 +32,7 @@ V-Sido CONNECT RCを有線もしくはBluetooth SPPでシリアル接続し、�
 ## ライセンス
 このサンプルコードは、GNU劣等GPLで配布します。  
   
-Copyright (C)2015 Daisuke IMAI <hine.gdw@gmail.com>  
+Copyright (C)2015 Daisuke IMAI \<<hine.gdw@gmail.com>\>  
 
 このライブラリはフリーソフトウェアです。あなたはこれを、フリーソフトウェア財団によって発行されたGNU 劣等一般公衆利用許諾契約書(バージョン2.1か、希望によってはそれ以降のバージョンのうちどれか)の定める条件の下で再頒布または改変することができます。  
 
@@ -41,7 +41,7 @@ Copyright (C)2015 Daisuke IMAI <hine.gdw@gmail.com>
 あなたはこのライブラリと共に、GNU 劣等一般公衆利用許諾契約書の複製物を一部受け取ったはずです。もし受け取っていなければ、フリーソフトウェア財団まで請求してください(宛先は the Free Software Foundation, Inc., 59Temple Place, Suite 330, Boston, MA 02111-1307 USA)。  
 
 
-Copyright (C) 2015 Daisuke IMAI <hine.gdw@gmail.com>
+Copyright (C) 2015 Daisuke IMAI \<<hine.gdw@gmail.com>\>
 
 This library is free software; you can redistribute it and/or modify it under the terms of the GNU Lesser General Public License as published by the Free Software Foundation; either version 2.1 of the License, or (at your option) any later version.  
 
