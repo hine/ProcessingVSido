@@ -133,7 +133,7 @@ void draw_all() {
 void add_all_ui() {
   //※DropdownListはUIを一番前面に持ってきたいので、最後に指定する
 
-  // 接続ボタン
+  // ポートリスト更新ボタン
   btn_refresh_port_list = cp5.addButton("refresh");
   uiCustomize(btn_refresh_port_list);
   btn_refresh_port_list.setPosition(60, gb_serial_conn.pos_y + 60);
@@ -208,7 +208,7 @@ void add_all_ui() {
   uiCustomize(btn_set_ik);
   btn_set_ik.setPosition(370, gb_ik.pos_y + 60);
   btn_set_ik.setSize(100, 20);
-  // 現在地取得ボタン
+  // 現在座標取得ボタン
   btn_get_ik = cp5.addButton("get_ik");
   uiCustomize(btn_get_ik);
   btn_get_ik.setPosition(480, gb_ik.pos_y + 60);
@@ -232,7 +232,7 @@ void add_all_ui() {
   nb_walk_turn.setMultiplier(-1.0);
   nb_walk_turn.setScrollSensitivity(10.0);
   nb_walk_turn.setValue(0.0);
-  // 現在地取得ボタン
+  // 歩行ボタン
   btn_walk = cp5.addButton("walk");
   uiCustomize(btn_walk);
   btn_walk.setPosition(480, gb_walk.pos_y + 30);
@@ -284,7 +284,7 @@ void add_all_ui() {
   uiCustomize(ta_log);
   ta_log.showScrollbar();
   ta_log.setPosition(610, 50);
-  ta_log.setSize(370, 540);
+  ta_log.setSize(370, 550);
   ta_log.setColorBackground(UI_INACTIVE_COLOR);
 
   // Status表示
@@ -425,6 +425,7 @@ void controlEvent(ControlEvent theEvent) {
         ta_log.setColorBackground(UI_INACTIVE_COLOR);
       }
     }
+    // GPIOのチェックボックス
     if (theEvent.group().name() == "gpio_pin4") {
       if (cb_gpio_pin4.getState(0)) {
         if (serial_connected) {
@@ -500,7 +501,7 @@ void controlEvent(ControlEvent theEvent) {
         try {
           serial_port = new Serial(this, Serial.list()[(int)(dl_serial_port.getValue())], Integer.parseInt(SERIAL_BAUTRATE_LIST[(int)(dl_serial_rate.getValue())]));
           serial_connected = true;
-          ta_status.setText("Connected.");
+          ta_status.setText("Connected. [Port:" + dl_serial_port.getItem((int)(dl_serial_port.getValue())).getName() + " Boudrate:" + dl_serial_rate.getItem((int)(dl_serial_rate.getValue())).getName() + "]");
         } catch (RuntimeException e) {
           serial_connected = false;
           ta_status.setText("Cannot connect. Maybe in use.");
@@ -555,6 +556,7 @@ void controlEvent(ControlEvent theEvent) {
   }
 }
 
+// コマンド送信
 void sendCommand(byte[] command) {
   if (serial_connected) {
     serial_port.write(command);
@@ -589,7 +591,7 @@ byte[] parseCommand(String command_string) {
   return command;
 }
 
-// サーボにターゲットIKを送るコマンドを生成する
+// サーボに角度の指示を送るコマンドを生成する
 byte[] makeSingleAngleCommand(int sid, float angle, int cycle) {
   byte[] data = {};
  
@@ -642,7 +644,7 @@ byte[] makeSetIKCommand(int kid, int x, int y, int z) {
   return data;
 }
 
-// サーボにIK位置を取得するコマンドを生成する
+// サーボからIK位置を取得するコマンドを生成する
 byte[] makeGetIKCommand(int kid) {
   byte[] data = {};
 
@@ -747,7 +749,7 @@ void check_serial_rx() {
       }
       buffer = (byte[])append(buffer, (byte)data);
       if (buffer.length > 3) {
-        // LNLN(3バイト目)を受信すると受信すべきバイト数がわかるので、LNの長さまではバッファに貯め続ける
+        // LN(3バイト目)を受信すると受信すべきバイト数がわかるので、LNの長さまではバッファに貯め続ける
         if (buffer.length == buffer[2]) {
           // LN(3バイト目)で指定された長さの受信をして、受信完了処理
           // リターンコードに応じた処理
