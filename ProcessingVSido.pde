@@ -13,7 +13,7 @@ final String[] SERIAL_BAUTRATE_LIST = {"115200", "9600", "57600", "1000000"};
 final String[] KID_LIST = {"0:BODY", "1:HEAD", "2:RIGHT ARM", "3:LEFT ARM", "4:RIGHT_LEG", "5:LEFT LEG"};
 
 final byte COMMAND_ST = (byte)0xff;
-final byte COMMAND_OP_TARGETANGLE = (byte)0x6f; // 'o'
+final byte COMMAND_OP_ANGLE = (byte)0x6f; // 'o'
 final byte COMMAND_OP_IK = (byte)0x6b; // 'k'
 final byte COMMAND_OP_WALK = (byte)0x74; // 't'
 final byte COMMAND_OP_SETVID = (byte)0x73; // 's'
@@ -57,8 +57,8 @@ GroupBox gb_serial_conn = new GroupBox(10, 10, 580, 90, "Serial Connection");
 GroupBox gb_servo_angle = new GroupBox(10, 110, 580, 60, "Servo Angle Command");
 GroupBox gb_ik = new GroupBox(10, 180, 580, 90, "IK Command");
 GroupBox gb_walk = new GroupBox(10, 280, 580, 60, "Walk Command");
-GroupBox gb_gpio = new GroupBox(10, 350, 580, 60, "GPIO");
-GroupBox gb_pwm = new GroupBox(10, 420, 580, 90, "PWM");
+GroupBox gb_gpio = new GroupBox(10, 350, 580, 60, "GPIO Command");
+GroupBox gb_pwm = new GroupBox(10, 420, 580, 90, "PWM Command");
 GroupBox gb_send_command = new GroupBox(10, 520, 580, 90, "Send Command");
 
 // シリアル接続関連
@@ -68,7 +68,6 @@ byte[] buffer = {};
 
 // 角度UIのための過去数値情報
 float last_angle = 0.0;
-boolean is_from_tf = false;
 
 void setup() {
   // Window立ち上げ
@@ -526,8 +525,6 @@ void controlEvent(ControlEvent theEvent) {
     }
     // SERVO角度を変更した時
     if (theEvent.controller().name() == "servo_angle") {
-      is_from_tf = true;
-      delay(100);
       try {
         sl_servo_angle.setValue(Float.parseFloat(tf_servo_angle.getText())); // todo:相互連動（今はスライダーからnumberboxへの一方向）
       } catch (RuntimeException e) {
@@ -537,9 +534,6 @@ void controlEvent(ControlEvent theEvent) {
     // SERVO角度スライダーを変更した時
     if (theEvent.controller().name() == "servo_angle_slider") {
       if (sl_servo_angle.getValue() != last_angle) {
-        if (is_from_tf) {
-          is_from_tf = false;
-        }
         tf_servo_angle.setText(str((float)(round(sl_servo_angle.getValue() * 10) / 10)));
         sendCommand(makeSingleAngleCommand((int)(nb_servo_id.getValue()), (float)(round(sl_servo_angle.getValue() * 10) / 10), (int)2));
         last_angle = sl_servo_angle.getValue();
@@ -604,6 +598,14 @@ byte[] adjustLnSum(byte[] command) {
   return command;  
 }
 
+// 2Byteデータを送る際にffを生み出さないためのデータ処理(詳細はV-Sido CONNECT RCのコマンドリファレンス参照)
+byte[] make2ByteData(int value) {
+  byte[] data = {0, 0};
+  data[0] = (byte)(((short)value << 1) &0x00ff); // L_Byte
+  data[1] = (byte)(((((short)value << 1) >> 8) << 1) & 0x00ff); // H_Byte
+  return data;
+}
+
 // テキストで渡された任意のコードをパースしてコマンドを生成する
 // ※16進数として扱えるかのチェック程度しかしていない
 byte[] parseCommand(String command_string) {
@@ -619,6 +621,7 @@ byte[] parseCommand(String command_string) {
     command = new byte[0];
   }
   if (cb_adjust_lnsum.getState(0)) {
+    // LNとSUMの自動調整チェックボックスにチェックが付いている場合はLNとSUMを調整してコマンドを返す
     return adjustLnSum(command);
   } else {
     return command;
@@ -630,14 +633,13 @@ byte[] makeSingleAngleCommand(int sid, float angle, int cycle) {
   byte[] data = {};
  
   data = (byte[])append(data, COMMAND_ST); // ST
-  data = (byte[])append(data, COMMAND_OP_TARGETANGLE); // OP
+  data = (byte[])append(data, COMMAND_OP_ANGLE); // OP
   data = (byte[])append(data, (byte)0); // LN仮置き（あとで計算する）
   data = (byte[])append(data, (byte)0x02); // CYC
   data = (byte[])append(data, (byte)sid); // SID
 
   float deg = angle * 10;
-  data = (byte[])append(data, (byte)(((short)deg << 1) &0x00ff)); // ANGLE_L
-  data = (byte[])append(data, (byte)(((((short)deg << 1) >> 8) << 1) & 0x00ff)); // ANGLE_H
+  data = (byte[])concat(data, make2ByteData((int)deg));
   
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
