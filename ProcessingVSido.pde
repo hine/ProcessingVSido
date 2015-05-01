@@ -67,7 +67,7 @@ byte[] buffer = {};
 
 // 角度UIのための過去数値情報
 float last_angle = 0.0;
-String use_ui = "";
+boolean is_from_tf = false;
 
 void setup() {
   // Window立ち上げ
@@ -172,7 +172,7 @@ void add_all_ui() {
   sl_servo_angle.setSize(260,16);
   sl_servo_angle.setRange(-180,180);
   sl_servo_angle.setNumberOfTickMarks(361);
-  sl_servo_angle.setValue(7.0); // Todo:何故か7ズレるので、0にするために7とセット。原因を調べる。
+  sl_servo_angle.setValue(0.0); // modeがFLEXIBLEだと数値がずれるがFIXならズレない。
 
   // IKのX
   nb_ik_x = cp5.addNumberbox("ik_x");
@@ -346,8 +346,9 @@ void uiCustomize(Numberbox nb) {
 // Slider
 void uiCustomize(Slider sl) {
   sl.setCaptionLabel("");
-  sl.setSliderMode(Slider.FLEXIBLE);
+  sl.setSliderMode(Slider.FIX); // 本当はFLEXIBLEがいいんだけど、何故か数値がずれるので
   sl.snapToTickMarks(true);
+  sl.setColorTickMark(UI_ACTIVE_COLOR);
   sl.setColorValueLabel(UI_TEXT_COLOR);
   sl.setColorBackground(UI_BG_COLOR);
   sl.setColorActive(UI_ACTIVE_COLOR);
@@ -373,6 +374,7 @@ void uiCustomize(Textarea ta) {
 // Textfield
 void uiCustomize(Textfield tf) {
   tf.setCaptionLabel("");
+  tf.setAutoClear(false);
   tf.setColor(UI_TEXT_COLOR);
   tf.setColorCursor(UI_TEXT_COLOR);
   tf.setColorLabel(UI_TEXT_COLOR);
@@ -487,7 +489,6 @@ void controlEvent(ControlEvent theEvent) {
   }
   else if (theEvent.isController()) {
     println("event from controller : "+theEvent.getController().getValue()+" from "+theEvent.getController());
-    if (theEvent.isFrom(theEvent.getController())) println("test");
     // REFRESHボタンをクリックした時
     if (theEvent.controller().name() == "refresh") {
       dl_serial_port.clear(); // リストを一旦削除
@@ -518,11 +519,20 @@ void controlEvent(ControlEvent theEvent) {
     }
     // SERVO角度を変更した時
     if (theEvent.controller().name() == "servo_angle") {
-      //sl_servo_angle.setValue(nb_servo_angle.getValue()); // todo:相互連動（今はスライダーからnumberboxへの一方向）
+      is_from_tf = true;
+      delay(100);
+      try {
+        sl_servo_angle.setValue(Float.parseFloat(tf_servo_angle.getText())); // todo:相互連動（今はスライダーからnumberboxへの一方向）
+      } catch (RuntimeException e) {
+        tf_servo_angle.setText(str((float)(round(sl_servo_angle.getValue() * 10) / 10)));        
+      }
     }
     // SERVO角度スライダーを変更した時
     if (theEvent.controller().name() == "servo_angle_slider") {
       if (sl_servo_angle.getValue() != last_angle) {
+        if (is_from_tf) {
+          is_from_tf = false;
+        }
         tf_servo_angle.setText(str((float)(round(sl_servo_angle.getValue() * 10) / 10)));
         sendCommand(makeSingleAngleCommand((int)(nb_servo_id.getValue()), (float)(round(sl_servo_angle.getValue() * 10) / 10), (int)2));
         last_angle = sl_servo_angle.getValue();
@@ -773,7 +783,7 @@ void check_serial_rx() {
             log_text += hex(buffer[i]);
           }
           log_text += "\n";
-          println(log_text);
+          //println(log_text);
           if (cb_log_visible.getState(0)) {
             ta_log.append(log_text);
             ta_log.scroll(1.0);
