@@ -29,7 +29,7 @@ Button btn_refresh_port_list;
 Button btn_serial_connect;
 Button btn_serial_disconnect;
 Numberbox nb_servo_id;
-Numberbox nb_servo_angle;
+Textfield tf_servo_angle;
 Slider sl_servo_angle;
 DropdownList dl_kid;
 Numberbox nb_ik_x;
@@ -67,6 +67,7 @@ byte[] buffer = {};
 
 // 角度UIのための過去数値情報
 float last_angle = 0.0;
+String use_ui = "";
 
 void setup() {
   // Window立ち上げ
@@ -159,14 +160,11 @@ void add_all_ui() {
   nb_servo_id.setScrollSensitivity(10.0);
   nb_servo_id.setValue(1.0);
   // サーボ角度
-  nb_servo_angle = cp5.addNumberbox("servo_angle");
-  uiCustomize(nb_servo_angle);
-  nb_servo_angle.setPosition(250, gb_servo_angle.pos_y + 30);
-  nb_servo_angle.setSize(60, 20);
-  nb_servo_angle.setRange(-180, 180);
-  nb_servo_angle.setMultiplier(-1.0);
-  nb_servo_angle.setScrollSensitivity(2.0);
-  nb_servo_angle.setValue(0.0);
+  tf_servo_angle = cp5.addTextfield("servo_angle");
+  uiCustomize(tf_servo_angle);
+  tf_servo_angle.setPosition(250, gb_servo_angle.pos_y + 30);
+  tf_servo_angle.setSize(60, 20);
+  tf_servo_angle.setText(str(0.0));
   // サーボ角度スライダー
   sl_servo_angle = cp5.addSlider("servo_angle_slider");
   uiCustomize(sl_servo_angle);
@@ -489,6 +487,7 @@ void controlEvent(ControlEvent theEvent) {
   }
   else if (theEvent.isController()) {
     println("event from controller : "+theEvent.getController().getValue()+" from "+theEvent.getController());
+    if (theEvent.isFrom(theEvent.getController())) println("test");
     // REFRESHボタンをクリックした時
     if (theEvent.controller().name() == "refresh") {
       dl_serial_port.clear(); // リストを一旦削除
@@ -524,7 +523,7 @@ void controlEvent(ControlEvent theEvent) {
     // SERVO角度スライダーを変更した時
     if (theEvent.controller().name() == "servo_angle_slider") {
       if (sl_servo_angle.getValue() != last_angle) {
-        nb_servo_angle.setValue(sl_servo_angle.getValue());
+        tf_servo_angle.setText(str((float)(round(sl_servo_angle.getValue() * 10) / 10)));
         sendCommand(makeSingleAngleCommand((int)(nb_servo_id.getValue()), (float)(round(sl_servo_angle.getValue() * 10) / 10), (int)2));
         last_angle = sl_servo_angle.getValue();
       }
