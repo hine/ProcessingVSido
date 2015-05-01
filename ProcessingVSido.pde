@@ -44,6 +44,7 @@ CheckBox cb_gpio_pin4;
 CheckBox cb_gpio_pin5;
 CheckBox cb_gpio_pin6;
 CheckBox cb_gpio_pin7;
+CheckBox cb_adjust_lnsum;
 Textfield tf_command;
 Button btn_send_command;
 CheckBox cb_log_visible;
@@ -258,6 +259,12 @@ void add_all_ui() {
   cb_gpio_pin7.setItemsPerRow(1);
   cb_gpio_pin7.addItem("pin7", 0);
 
+  // 任意のコマンド送信時に自動的にLNとSUMを計算するチェックボックス
+  cb_adjust_lnsum = cp5.addCheckBox("adjust_lnsum");
+  uiCustomize(cb_adjust_lnsum);
+  cb_adjust_lnsum.setPosition(400, gb_send_command.pos_y + 30);
+  cb_adjust_lnsum.setItemsPerRow(1);
+  cb_adjust_lnsum.addItem("auto adjust LN/SUM", 0);
   // 任意のコマンドを送信するためのテキストフィールド
   tf_command = cp5.addTextfield("send_command");
   uiCustomize(tf_command);
@@ -557,7 +564,7 @@ void controlEvent(ControlEvent theEvent) {
       }
     }
     // SENDボタンをクリックした時
-    if (theEvent.controller().name() == "send") {
+    if ((theEvent.controller().name() == "send") || (theEvent.controller().name() == "send_command")) {
       if (serial_connected) {
         sendCommand(parseCommand(tf_command.getText()));
       }
@@ -583,6 +590,20 @@ void sendCommand(byte[] command) {
   }
 }
 
+// コマンドのLNとSUMを計算する
+byte[] adjustLnSum(byte[] command) {
+  if (command.length > 3) {
+    command[2] = byte(command.length);
+
+    byte sum = 0;
+    for (int i = 0; i < command.length - 1; i++) {
+      sum ^= command[i];
+    }
+    command[command.length - 1] = sum;
+  }
+  return command;  
+}
+
 // テキストで渡された任意のコードをパースしてコマンドを生成する
 // ※16進数として扱えるかのチェック程度しかしていない
 byte[] parseCommand(String command_string) {
@@ -597,7 +618,11 @@ byte[] parseCommand(String command_string) {
     System.out.println("illegal command format.");
     command = new byte[0];
   }
-  return command;
+  if (cb_adjust_lnsum.getState(0)) {
+    return adjustLnSum(command);
+  } else {
+    return command;
+  }
 }
 
 // サーボに角度の指示を送るコマンドを生成する
@@ -616,14 +641,7 @@ byte[] makeSingleAngleCommand(int sid, float angle, int cycle) {
   
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // サーボにIK位置を指示するコマンドを生成する
@@ -643,14 +661,7 @@ byte[] makeSetIKCommand(int kid, int x, int y, int z) {
   
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // サーボからIK位置を取得するコマンドを生成する
@@ -665,14 +676,7 @@ byte[] makeGetIKCommand(int kid) {
 
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // サーボに歩行コマンドを生成する
@@ -691,14 +695,7 @@ byte[] makeWalkCommand(int speed, int turn) {
   
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // VIDの値のセットコマンドを生成する
@@ -713,14 +710,7 @@ byte[] makeVidSetCommand(int vid, int vdata) {
 
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // GPIOコマンドを生成する
@@ -735,14 +725,7 @@ byte[] makeGPIOCommand(int port, int value) {
 
   data = (byte[])append(data, (byte)0); // SUM仮置き
 
-  data[2] = byte(data.length);
-
-  byte sum = 0;
-  for (int i = 0; i < data.length - 1; i++) {
-    sum ^= data[i];
-  }
-  data[data.length - 1] = sum;
-  return data;
+  return adjustLnSum(data);
 }
 
 // シリアル受信処理（CONNECTからのリターンコード）
